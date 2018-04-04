@@ -1,0 +1,127 @@
+---
+title: "Facebook Words Frequency"
+author: "Shin Lee"
+date: "2018-04-04"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+load("psy.eng.pre.0401.RData")
+load("bts.eng.pre.0401.RData")
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidytext)
+```
+
+```{r}
+psy.tidy <- psy.eng.pre %>% 
+  group_by(date) %>% 
+  mutate(commenter = row_number()) %>% 
+  mutate(text = comment_nonemj_nonum_nohashtag_noat_noabbr_noemo_nopunct_nonumany) %>% 
+  select(date, languages, commenter, text) %>%
+  arrange(date) %>% 
+  ungroup()
+bts.tidy <- bts.eng.pre %>% 
+  group_by(date) %>% 
+  mutate(commenter = row_number()) %>% 
+  mutate(text = comment_nonemj_nonum_nohashtag_noat_noabbr_noemo_nopunct_nonumany) %>% 
+  select(date, languages, commenter, text) %>%
+  arrange(date) %>% 
+  ungroup()
+fb_tidy <- bind_rows(psy.tidy %>% 
+                       mutate(artist="PSY"),
+                     bts.tidy %>% 
+                       mutate(artist="BTS"))
+```
+
+# Word Frequency
+```{r}
+fb_words <- fb_tidy %>% 
+  unnest_tokens(word, text) %>% 
+  count(artist, word, sort=TRUE) %>% 
+  ungroup()
+
+total_words <- fb_words %>% 
+  group_by(artist) %>% 
+  summarize(total = sum(n))
+
+fb_words <- left_join(fb_words, total_words) %>% 
+   mutate(freq = n/total)
+
+fb_words
+
+## Top 100 words in frequency from PSY FB Page
+fb_words %>% 
+  filter(artist=="PSY") %>% 
+  top_n(100, n)
+
+## Bottom 100 words in frequency from PSY FB Page
+fb_words %>% 
+  filter(artist=="PSY") %>% 
+  top_n(-100, n)
+
+## Top 100 words in frequency from BTS FB Page
+fb_words %>% 
+  filter(artist=="BTS") %>% 
+  top_n(100, n)
+
+## Bottom 100 words in frequency from BTS FB Page
+fb_words %>% 
+  filter(artist=="BTS") %>% 
+  top_n(-100, n)
+```
+
+  * From user comments on PSY Facebook page, 874,322 words in total were tokenized. 
+  * From user comments on BTS Facebook page, 1,957,359 words in total were tokenized.
+
+# Zipf's Law
+```{r}
+## Total unique words (Psy: 35,920; BTS: 70,654)
+freq_by_rank <- fb_words %>% 
+  group_by(artist) %>% 
+  mutate(rank = row_number())
+
+freq_by_rank
+
+freq_by_rank %>% 
+  ggplot(aes(rank, freq, color=artist)) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) +
+  scale_x_log10() +
+  scale_y_log10()
+
+## Top 10000 words
+freq_by_rank_10000 <- fb_words %>% 
+  group_by(artist) %>% 
+  mutate(rank = row_number()) %>% 
+  filter(rank <= 10000)
+
+freq_by_rank_10000 %>% 
+  ggplot(aes(rank, freq, color=artist)) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) +
+  scale_x_log10() +
+  scale_y_log10()
+
+## Top 100 words
+freq_by_rank_10000 <- fb_words %>% 
+  group_by(artist) %>% 
+  mutate(rank = row_number()) %>% 
+  filter(rank <= 100)
+
+freq_by_rank_10000 %>% 
+  ggplot(aes(rank, freq, color=artist)) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) +
+  scale_x_log10() +
+  scale_y_log10()
+
+```
+
